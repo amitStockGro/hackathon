@@ -7,6 +7,7 @@ import requests
 import logging
 from collections import Counter
 from stock_explorer import fetch_stock_data
+from trade_view import fetch_trade_views, render_trade_views_table, render_trade_views_summary, render_sector_analysis, prepare_trade_views_dataframe
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -650,77 +651,98 @@ def render_visualizations():
 
 
 def render_sidebar():
-    """Render sidebar with actions and information"""
+    """Render sidebar with improved UI layout and organization"""
     with st.sidebar:
         try:
             st.image("image.png", width=70)
         except:
             st.markdown("📈")
 
-        st.title("🔧 Actions")
+        # Main Actions Section
+        with st.expander("🔧 Actions", expanded=True):
+            # Refresh buttons in columns
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.button("🔄 News", help="Refresh market news", use_container_width=True):
+                    with st.spinner("Loading latest news..."):
+                        st.session_state.news_data = fetch_news_data()
+                        if st.session_state.news_data:
+                            st.success(f"Loaded {len(st.session_state.news_data)} news items!")
+                            st.rerun()
 
-        if st.button("🔄 Refresh News", use_container_width=True):
-            with st.spinner("Loading latest news..."):
-                st.session_state.news_data = fetch_news_data()
-                if st.session_state.news_data:
-                    st.success(f"Loaded {len(st.session_state.news_data)} news items!")
-                    st.rerun()
+            with col2:
+                if st.session_state.api_response is not None:
+                    if st.button("🔄 Portfolio", help="Reset portfolio to original", use_container_width=True):
+                        st.session_state.edited_df = prepare_dataframe(st.session_state.api_response)
+                        st.success("Portfolio reset!")
+                        st.rerun()
 
-        if st.session_state.api_response is not None:
-            if st.button("🔄 Reset Portfolio", use_container_width=True):
-                st.session_state.edited_df = prepare_dataframe(st.session_state.api_response)
-                st.success("Portfolio reset to original recommendations!")
-                st.rerun()
-
+            # Download button
             if st.session_state.edited_df is not None:
                 csv = st.session_state.edited_df.to_csv(index=False).encode('utf-8')
                 st.download_button(
-                    label="📥 Download Portfolio CSV",
+                    label="📥 Export Portfolio",
                     data=csv,
                     file_name=f"portfolio_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                     mime='text/csv',
-                    use_container_width=True
+                    use_container_width=True,
+                    help="Download your portfolio as CSV"
                 )
 
-        st.markdown("---")
-
+        # Portfolio Summary Section
         if st.session_state.edited_df is not None:
-            st.markdown("### 📊 Portfolio Summary")
-            total_stocks = len(st.session_state.edited_df)
-            total_invested = st.session_state.edited_df["Amount (₹)"].sum()
+            with st.expander("📊 Portfolio Summary", expanded=True):
+                total_stocks = len(st.session_state.edited_df)
+                total_invested = st.session_state.edited_df["Amount (₹)"].sum()
 
-            st.metric("Total Stocks", total_stocks)
-            st.metric("Total Investment", f"₹{total_invested:,.0f}")
+                st.metric("Total Stocks", total_stocks)
+                st.metric("Total Investment", f"₹{total_invested:,.0f}")
 
-            if st.session_state.last_edit_time:
-                st.caption(f"Last updated: {st.session_state.last_edit_time.strftime('%H:%M:%S')}")
+                if st.session_state.last_edit_time:
+                    st.caption(f"Last updated: {st.session_state.last_edit_time.strftime('%H:%M:%S')}")
 
+        # News Sentiment Section
         if st.session_state.news_data:
-            st.markdown("### 📰 News Summary")
-            sentiment_counts = Counter([item['sentiment_category'] for item in st.session_state.news_data])
-            total_news = len(st.session_state.news_data)
+            with st.expander("📰 News Sentiment", expanded=True):
+                sentiment_counts = Counter([item['sentiment_category'] for item in st.session_state.news_data])
+                total_news = len(st.session_state.news_data)
 
-            st.metric("Total News", total_news)
+                # Sentiment meter
+                st.metric("Total News Items", total_news)
 
-            for sentiment, count in sentiment_counts.most_common(3):
-                percentage = (count / total_news) * 100
-                st.caption(f"{sentiment}: {count} ({percentage:.1f}%)")
+                for sentiment, color in SENTIMENT_COLORS.items():
+                    count = sentiment_counts.get(sentiment, 0)
+                    if count > 0:
+                        percentage = (count / total_news) * 100
+                        st.markdown(f"""
+                        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+                            <div style="width: 12px; height: 12px; background-color: {color}; 
+                                        border-radius: 3px; margin-right: 8px;"></div>
+                            <span style="flex-grow: 1;">{sentiment}</span>
+                            <span>{count} ({percentage:.1f}%)</span>
+                        </div>
+                        """, unsafe_allow_html=True)
 
-        st.markdown("---")
-        st.markdown("### ℹ️ About")
-        st.markdown("""
-        **Features:**
-        - 🎯 Personalized recommendations
-        - ✏️ Editable portfolio allocation
-        - 📊 Interactive visualizations
-        - 📰 Real-time news sentiment analysis
-        - 📥 CSV export functionality
-        - 🔄 Real-time calculations
-        """)
+        # About Section
+        with st.expander("ℹ️ About This App", expanded=False):
+            st.markdown("""
+            **Smart Stock Investment Advisor** helps you:
+            - Get personalized recommendations
+            - Analyze market sentiment
+            - Track live stock data
+            - Optimize your portfolio
 
-        st.markdown("---")
-        st.markdown("**Made with ❤️ by Team 777**")
+            **Key Features:**
+            - ✨ AI-powered analysis
+            - 📈 Real-time data
+            - 💰 Portfolio optimization
+            - 📰 News sentiment tracking
 
+            Made with ❤️ by Team 777
+            """)
+
+            st.markdown("---")
+            st.caption("v1.0 | Last updated: July 2023")
 
 def safe_convert_numeric(value, default=0.0):
     """Safely convert value to numeric with fallback"""
@@ -986,8 +1008,9 @@ def main():
         with st.spinner("Loading market news..."):
             st.session_state.news_data = fetch_news_data()
 
-    # Main navigation with Stock Explorer tab
-    tab1, tab2, tab3 = st.tabs(["💰 Investment Analysis", "📰 News & Sentiment", "🔍 Stock Explorer"])
+    # Main navigation with all tabs including Trade Views
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["💰 Investment Analysis", "📰 News & Sentiment", "🔍 Stock Explorer", "🐂 Trade Views"])
 
     with tab1:
         render_input_form()
@@ -1027,9 +1050,44 @@ def main():
         stock_df = prepare_stock_dataframe(stock_data) if stock_data else None
         render_stock_explorer(stock_df)
 
+    with tab4:
+        # Trade Views tab with refresh functionality
+        col1, col2 = st.columns([4, 1])
+        with col2:
+            if st.button("🔄 Refresh Trade Views", key="refresh_trade_views",
+                         help="Clear cache and reload fresh trade views data"):
+                # Clear the trade views cache
+                fetch_trade_views.clear()
+                st.rerun()
+
+        # Render the trade views dashboard
+        try:
+            # Fetch and process trade views data
+            trade_views_data = fetch_trade_views()
+            trade_views_df = prepare_trade_views_dataframe(trade_views_data) if trade_views_data else None
+
+            if trade_views_df is None or trade_views_df.empty:
+                st.warning("⚠️ No live bullish trades available at the moment.")
+                st.info(
+                    "This could be due to market conditions or data availability. Please try refreshing in a few minutes.")
+            else:
+                # Render trade views components
+                render_trade_views_summary(trade_views_df)
+                st.markdown("---")
+                render_sector_analysis(trade_views_df)
+                st.markdown("---")
+                render_trade_views_table(trade_views_df)
+
+                # Footer with last updated time
+                st.markdown("---")
+                st.caption(f"Trade views last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+        except Exception as e:
+            st.error(f"❌ Error loading trade views: {str(e)}")
+            logger.error(f"Trade views error in main: {e}")
+
     # Render sidebar
     render_sidebar()
-
 
 if __name__ == "__main__":
     main()
