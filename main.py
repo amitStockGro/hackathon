@@ -6,6 +6,7 @@ from datetime import datetime
 import requests
 import logging
 from collections import Counter
+from stock_explorer import fetch_stock_data
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -719,43 +720,6 @@ def render_sidebar():
 
         st.markdown("---")
         st.markdown("**Made with ❤️ by Team 777**")
-
-
-# Stock Explorer Functions (embedded to avoid import issues)
-@st.cache_data(ttl=300, show_spinner=False)
-def fetch_stock_data():
-    """Fetch stock data from API with enhanced error handling"""
-    try:
-        with st.spinner("🔄 Fetching latest stock data..."):
-            logger.info("Fetching stock data from API")
-            response = requests.get("http://localhost:80/hackathon/stocks", timeout=15)
-            response.raise_for_status()
-
-            api_data = response.json()
-            if api_data.get("success", False):
-                data = api_data.get("data", [])
-                logger.info(f"Successfully fetched {len(data)} stocks")
-                return data
-            else:
-                error_msg = api_data.get('message', 'Unknown API error')
-                st.error(f"🚫 Stock API Error: {error_msg}")
-                logger.error(f"API returned error: {error_msg}")
-                return None
-
-    except requests.exceptions.Timeout:
-        st.error("⏰ Request timed out. The server might be slow - please try again.")
-        logger.error("API request timeout")
-    except requests.exceptions.ConnectionError:
-        st.error("🔌 Cannot connect to the stock API server. Please check if the server is running.")
-        logger.error("API connection error")
-    except requests.exceptions.HTTPError as e:
-        st.error(f"🚫 HTTP Error {e.response.status_code}: Server returned an error")
-        logger.error(f"HTTP error: {e}")
-    except Exception as e:
-        st.error(f"❌ Unexpected error occurred: {str(e)}")
-        logger.error(f"Unexpected error: {e}")
-
-    return None
 
 
 def safe_convert_numeric(value, default=0.0):
