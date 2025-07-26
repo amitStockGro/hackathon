@@ -56,8 +56,8 @@ def fetch_stock_data():
         st.error("⏰ Request timed out. The server might be slow - please try again.")
         logger.error("API request timeout")
     except requests.exceptions.ConnectionError:
-        st.error("🔌 Cannot connect to the stock API server. Please check if the server is running.")
-        logger.error("API connection error")
+        st.error(f"🔌 Connection Error Details: {str(requests.exceptions.ConnectionError)}")
+        logger.error(f"Detailed connection error: {str(requests.exceptions.ConnectionError)}")
     except requests.exceptions.HTTPError as e:
         st.error(f"🚫 HTTP Error {e.response.status_code}: Server returned an error")
         logger.error(f"HTTP error: {e}")
