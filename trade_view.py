@@ -31,7 +31,7 @@ def fetch_trade_views() -> Optional[Dict[str, List[Dict]]]:
         with st.spinner("🔄 Fetching latest trade views..."):
             logger.info("Fetching trade views data from API")
             response = requests.get(
-                "http://localhost:80/hackathon/trade-views",
+                "https://stage.stockgro.com/hackathon/trade-views",
                 timeout=1
             )
             response.raise_for_status()

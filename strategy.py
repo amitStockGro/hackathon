@@ -149,7 +149,7 @@ def execute_strategy(payload: Dict) -> Optional[Dict]:
         logger.debug(f"Payload: {json.dumps(payload, indent=2)}")
 
         response = requests.get(
-            "http://localhost:80/hackathon/strategy/result",
+            "https://stage.stockgro.com/hackathon/strategy/result",
             headers={"Content-Type": "application/json"},
             json=payload,
             timeout=API_TIMEOUT
