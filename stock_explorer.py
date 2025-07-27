@@ -38,7 +38,7 @@ def fetch_stock_data():
     try:
         with st.spinner("🔄 Fetching latest stock data..."):
             logger.info("Fetching stock data from API")
-            response = requests.get("https://stage.stockgro.com/hackathon/stocks", timeout=30)
+            response = requests.get("http://localhost:80/hackathon/stocks", timeout=30)
             response.raise_for_status()
 
             api_data = response.json()

@@ -40,7 +40,7 @@ def categorize_sentiment(score):
 def fetch_news_data():
     """Fetch news data from API with error handling"""
     try:
-        response = requests.get("https://stage.stockgro.com/hackathon/news", timeout=30)
+        response = requests.get("http://localhost:80/hackathon/news", timeout=30)
         response.raise_for_status()
 
         api_data = response.json()

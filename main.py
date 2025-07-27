@@ -6,9 +6,11 @@ from collections import Counter
 
 # Import custom modules
 from stock_explorer import fetch_stock_data
-from trade_view import fetch_trade_views, render_trade_views_table, render_trade_views_summary, render_sector_analysis, prepare_trade_views_dataframe
+from trade_view import fetch_trade_views, render_trade_views_table, render_trade_views_summary, render_sector_analysis, \
+    prepare_trade_views_dataframe
 from investment_analysis import render_investment_analysis_tab
 from news_sentiment import fetch_news_data, render_news_sentiment_tab, render_sidebar_news_sentiment
+from strategy import render_strategy_builder  # Import the strategy builder
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -36,7 +38,17 @@ def initialize_session_state():
         'horizon_index': 1,
         'last_edit_time': None,
         'show_news': True,
-        'selected_sentiment_filter': 'All'
+        'selected_sentiment_filter': 'All',
+        # Strategy builder session state
+        'technical_indicators': [],
+        'sentiment_rules': [],
+        'trade_view_rules': [],
+        'stock_score_rule': None,
+        'market_cap_rule': None,
+        'sector_rule': None,
+        'volume_rule': None,
+        'price_rule': None,
+        'strategy_results': None
     }
 
     for key, value in defaults.items():
@@ -323,6 +335,25 @@ def render_sidebar():
                 if st.session_state.last_edit_time:
                     st.caption(f"Last updated: {st.session_state.last_edit_time.strftime('%H:%M:%S')}")
 
+        # Strategy Summary Section
+        if (st.session_state.get('strategy_results') and
+                isinstance(st.session_state.strategy_results, list) and
+                len(st.session_state.strategy_results) > 0):
+            with st.expander("🎯 Strategy Results", expanded=True):
+                results_count = len(st.session_state.strategy_results)
+                st.metric("Matching Stocks", results_count)
+
+                if results_count > 0:
+                    # Calculate average strategy score
+                    avg_score = sum(
+                        result.get('overall_score', 0) for result in st.session_state.strategy_results) / results_count
+                    st.metric("Avg Strategy Score", f"{avg_score:.1f}")
+
+                    # Show top recommendation
+                    top_stock = max(st.session_state.strategy_results, key=lambda x: x.get('overall_score', 0))
+                    top_symbol = top_stock.get('stock', {}).get('symbol', 'N/A')
+                    st.write(f"🏆 Top Pick: **{top_symbol}**")
+
         # News Sentiment Section
         render_sidebar_news_sentiment()
 
@@ -334,18 +365,20 @@ def render_sidebar():
             - Analyze market sentiment
             - Track live stock data
             - Optimize your portfolio
+            - Build custom strategies
 
             **Key Features:**
             - ✨ AI-powered analysis
             - 📈 Real-time data
             - 💰 Portfolio optimization
             - 📰 News sentiment tracking
+            - 🎯 Custom strategy builder
 
             Made with ❤️ by Team 777
             """)
 
             st.markdown("---")
-            st.caption("v1.0 | Last updated: July 2023")
+            st.caption("v1.1 | Last updated: July 2025")
 
 
 def main():
@@ -358,9 +391,9 @@ def main():
         with st.spinner("Loading market news..."):
             st.session_state.news_data = fetch_news_data()
 
-    # Main navigation with all tabs including Trade Views
-    tab1, tab2, tab3, tab4 = st.tabs(
-        ["💰 Investment Analysis", "📰 News & Sentiment", "🔍 Stock Explorer", "🐂 Trade Views"])
+    # Main navigation with all tabs including Strategy Builder
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(
+        ["💰 Investment Analysis", "📰 News & Sentiment", "🔍 Stock Explorer", "🐂 Trade Views", "🎯 Strategy Builder"])
 
     with tab1:
         render_investment_analysis_tab()
@@ -418,6 +451,37 @@ def main():
         except Exception as e:
             st.error(f"❌ Error loading trade views: {str(e)}")
             logger.error(f"Trade views error in main: {e}")
+
+    with tab5:
+        # Strategy Builder tab
+        try:
+            # Add helpful description at the top
+            st.info(
+                "🎯 **Strategy Builder**: Create custom stock screening strategies using technical indicators, sentiment analysis, and fundamental filters. Build your strategy step by step and execute it to find stocks that match your criteria.")
+
+            # Render the strategy builder interface
+            render_strategy_builder()
+
+        except Exception as e:
+            st.error(f"❌ Error loading strategy builder: {str(e)}")
+            logger.error(f"Strategy builder error in main: {e}")
+
+            # Provide fallback message
+            st.markdown("""
+            ### 🎯 Strategy Builder (Temporarily Unavailable)
+
+            The strategy builder is currently experiencing issues. Please try:
+            1. Refreshing the page
+            2. Checking your internet connection
+            3. Contacting support if the issue persists
+
+            **What you can do with Strategy Builder:**
+            - Create custom technical indicator rules
+            - Set sentiment analysis filters  
+            - Define fundamental criteria (price, volume, market cap)
+            - Execute strategies to find matching stocks
+            - Download results for further analysis
+            """)
 
     # Render sidebar
     render_sidebar()
