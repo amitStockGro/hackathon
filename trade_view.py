@@ -32,7 +32,7 @@ def fetch_trade_views() -> Optional[Dict[str, List[Dict]]]:
             logger.info("Fetching trade views data from API")
             response = requests.get(
                 "https://stage.stockgro.com/hackathon/trade-views",
-                timeout=5
+                timeout=1
             )
             response.raise_for_status()
 
