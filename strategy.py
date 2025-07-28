@@ -44,11 +44,16 @@ MARKET_CAP_CATEGORIES = ["large", "mid", "small"]
 RECOMMENDATIONS = ["BUY"]
 
 # Available sectors based on common Indian market sectors
-SECTORS = [
-    "Technology", "Healthcare", "Finance", "Energy", "Consumer",
-    "Industrial", "Materials", "Utilities", "Real Estate", "Telecom",
-    "Automotive", "Banking", "Pharmaceuticals", "IT Services", "FMCG"
-]
+SECTORS = (
+    "Power", "Infrastructure", "FMCG", "Telecom", "Non - Ferrous Metals", "Healthcare",
+    "Diamond & Jewellery", "Iron & Steel", "Finance", "IT", "Textile", "Hospitality",
+    "Inds. Gases & Fuels", "Paper", "Business Services", "Automobile & Ancillaries",
+    "Ship Building", "Aviation", "Diversified", "Chemicals", "Consumer Durables",
+    "Plastic Products", "Alcohol", "Capital Goods", "Logistics", "Realty", "Abrasives",
+    "Mining", "Electricals", "Media & Entertainment", "Bank", "Trading",
+    "Gas Transmission", "Retailing", "Ratings", "Insurance", "Ferro Manganese",
+    "Construction Materials", "Agri", "Crude Oil", "Miscellaneous"
+)
 
 def create_strategy_payload(strategy_config: Dict) -> Dict:
     """Create API payload from strategy configuration"""
