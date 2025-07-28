@@ -18,7 +18,6 @@ CACHE_TTL = 300
 
 # Technical Indicators Options
 TECHNICAL_INDICATORS = {
-    "sma": "Simple Moving Average",
     "rsi": "Relative Strength Index",
     "macd": "MACD",
     "atr": "Average True Range",
