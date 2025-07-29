@@ -743,10 +743,6 @@ def render_strategy_results(results: List[Dict]):
         avg_price = df["Current Price (₹)"].mean()
         st.metric("💰 Avg Price", f"₹{avg_price:,.2f}")
 
-    with col3:
-        total_volume = df["Volume"].sum()
-        st.metric("📊 Total Volume", f"{total_volume:,}")
-
     # Visualization tabs
     tab1, tab2 = st.tabs(["📊 Results Table", "📈 Analytics"])
 

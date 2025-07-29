@@ -4,14 +4,6 @@ import logging
 from datetime import datetime
 from collections import Counter
 
-# Import custom modules
-from stock_explorer import fetch_stock_data
-from trade_view import fetch_trade_views, render_trade_views_table, render_trade_views_summary, render_sector_analysis, \
-    prepare_trade_views_dataframe
-from investment_analysis import render_investment_analysis_tab
-from news_sentiment import fetch_news_data, render_news_sentiment_tab, render_sidebar_news_sentiment
-from strategy import render_strategy_builder  # Import the strategy builder
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -23,6 +15,56 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# Import custom modules with error handling
+try:
+    from stock_explorer import fetch_stock_data
+
+    STOCK_EXPLORER_AVAILABLE = True
+except ImportError as e:
+    logger.error(f"Stock explorer module not available: {e}")
+    STOCK_EXPLORER_AVAILABLE = False
+
+try:
+    from trade_view import fetch_trade_views, render_trade_views_table, render_trade_views_summary, \
+        render_sector_analysis, prepare_trade_views_dataframe
+
+    TRADE_VIEW_AVAILABLE = True
+except ImportError as e:
+    logger.error(f"Trade view module not available: {e}")
+    TRADE_VIEW_AVAILABLE = False
+
+try:
+    from investment_analysis import render_investment_analysis_tab
+
+    INVESTMENT_ANALYSIS_AVAILABLE = True
+except ImportError as e:
+    logger.error(f"Investment analysis module not available: {e}")
+    INVESTMENT_ANALYSIS_AVAILABLE = False
+
+try:
+    from news_sentiment import fetch_news_data, render_news_sentiment_tab, render_sidebar_news_sentiment
+
+    NEWS_SENTIMENT_AVAILABLE = True
+except ImportError as e:
+    logger.error(f"News sentiment module not available: {e}")
+    NEWS_SENTIMENT_AVAILABLE = False
+
+try:
+    from strategy import render_strategy_builder
+
+    STRATEGY_AVAILABLE = True
+except ImportError as e:
+    logger.error(f"Strategy module not available: {e}")
+    STRATEGY_AVAILABLE = False
+
+try:
+    from learn import render_learn_tab
+
+    LEARN_AVAILABLE = True
+except ImportError as e:
+    logger.error(f"Learn module not available: {e}")
+    LEARN_AVAILABLE = False
 
 
 # Initialize session state with defaults
@@ -48,7 +90,19 @@ def initialize_session_state():
         'sector_rule': None,
         'volume_rule': None,
         'price_rule': None,
-        'strategy_results': None
+        'strategy_results': None,
+        # Learning progress session state
+        'learning_progress': {
+            "completed_topics": set(),
+            "bookmarks": set(),
+            "current_phase": "Beginner",
+            "study_time": 0,
+            "quiz_scores": {}
+        },
+        # Quiz state
+        'quiz_active': False,
+        'current_question': 0,
+        'quiz_score': 0
     }
 
     for key, value in defaults.items():
@@ -151,7 +205,8 @@ def render_stock_explorer(stock_df):
     if stock_df is None or stock_df.empty:
         st.warning("📭 No stock data available. Please try refreshing or check your connection.")
         if st.button("🔄 Retry", type="primary", key="retry_button"):
-            fetch_stock_data.clear()
+            if STOCK_EXPLORER_AVAILABLE:
+                fetch_stock_data.clear()
             st.rerun()
         return
 
@@ -167,9 +222,6 @@ def render_stock_explorer(stock_df):
     with col3:
         avg_price = stock_df["Last Trade Price"].mean()
         st.metric("💰 Avg Price", f"₹{avg_price:.2f}")
-    with col4:
-        total_volume = stock_df["Volume"].sum()
-        st.metric("📈 Total Volume", f"{total_volume:,.0f}")
 
     # Enhanced filters
     st.markdown("### 🔧 Filters")
@@ -316,15 +368,15 @@ def render_stock_explorer(stock_df):
 
 
 def render_sidebar():
-    """Render simplified sidebar without action buttons"""
+    """Render simplified sidebar with proper error handling"""
     with st.sidebar:
         try:
             st.image("image.png", width=70)
         except:
             st.markdown("📈")
 
-        # Portfolio Summary Section (moved from actions)
-        if st.session_state.edited_df is not None:
+        # Portfolio Summary Section
+        if st.session_state.get('edited_df') is not None:
             with st.expander("📊 Portfolio Summary", expanded=True):
                 total_stocks = len(st.session_state.edited_df)
                 total_invested = st.session_state.edited_df["Amount (₹)"].sum()
@@ -332,7 +384,7 @@ def render_sidebar():
                 st.metric("Total Stocks", total_stocks)
                 st.metric("Total Investment", f"₹{total_invested:,.0f}")
 
-                if st.session_state.last_edit_time:
+                if st.session_state.get('last_edit_time'):
                     st.caption(f"Last updated: {st.session_state.last_edit_time.strftime('%H:%M:%S')}")
 
         # Strategy Summary Section
@@ -354,8 +406,43 @@ def render_sidebar():
                     top_symbol = top_stock.get('stock', {}).get('symbol', 'N/A')
                     st.write(f"🏆 Top Pick: **{top_symbol}**")
 
+        # Learning Progress Section (with proper error handling)
+        try:
+            learning_progress = st.session_state.get('learning_progress', {})
+            completed_topics = learning_progress.get('completed_topics', set())
+
+            if completed_topics and len(completed_topics) > 0:
+                with st.expander("🎓 Learning Progress", expanded=True):
+                    completed_count = len(completed_topics)
+                    current_phase = learning_progress.get('current_phase', 'Beginner')
+
+                    st.metric("Topics Completed", completed_count)
+                    st.metric("Current Level", current_phase)
+
+                    # Progress bar based on phase
+                    phase_progress = {
+                        "Beginner": min(completed_count / 5, 1.0),
+                        "Intermediate": min(max(completed_count - 5, 0) / 8, 1.0),
+                        "Advanced": min(max(completed_count - 13, 0) / 6, 1.0),
+                        "Expert": min(max(completed_count - 19, 0) / 4, 1.0)
+                    }
+
+                    current_progress = phase_progress.get(current_phase, 0)
+                    st.progress(current_progress)
+
+                    if completed_count > 0:
+                        st.caption("Keep learning! 📚")
+        except Exception as e:
+            logger.error(f"Error displaying learning progress: {e}")
+            # Don't show error to user, just log it
+
         # News Sentiment Section
-        render_sidebar_news_sentiment()
+        if NEWS_SENTIMENT_AVAILABLE:
+            try:
+                render_sidebar_news_sentiment()
+            except Exception as e:
+                logger.error(f"Error rendering news sentiment: {e}")
+                st.error("⚠️ News sentiment temporarily unavailable")
 
         # About Section
         with st.expander("ℹ️ About This App", expanded=False):
@@ -366,6 +453,7 @@ def render_sidebar():
             - Track live stock data
             - Optimize your portfolio
             - Build custom strategies
+            - Learn stock market fundamentals
 
             **Key Features:**
             - ✨ AI-powered analysis
@@ -373,33 +461,89 @@ def render_sidebar():
             - 💰 Portfolio optimization
             - 📰 News sentiment tracking
             - 🎯 Custom strategy builder
+            - 🎓 Interactive learning center
 
             Made with ❤️ by Team 777
             """)
 
             st.markdown("---")
-            st.caption("v1.1 | Last updated: July 2025")
+            st.caption("v1.2 | Last updated: July 2025")
+
+
+def render_fallback_tab(tab_name, description):
+    """Render fallback content for unavailable tabs"""
+    st.error(f"❌ {tab_name} module is not available")
+    st.markdown(f"""
+    ### {tab_name} (Temporarily Unavailable)
+
+    The {tab_name.lower()} module is currently experiencing issues. This could be due to:
+    1. Missing module dependencies
+    2. Import errors
+    3. Configuration issues
+
+    **Expected Features:**
+    {description}
+
+    Please contact the administrator to resolve this issue.
+    """)
 
 
 def main():
     """Main application function"""
     st.title("📈 Smart Stock Investment Advisor")
-    st.markdown("*Get personalized stock recommendations with real-time market sentiment analysis*")
+    st.markdown(
+        "*Get personalized stock recommendations with real-time market sentiment analysis and comprehensive learning resources*")
 
-    # Load news data on app start if not already loaded
-    if st.session_state.news_data is None and st.session_state.show_news:
+    # Load news data on app start if not already loaded and module is available
+    if (NEWS_SENTIMENT_AVAILABLE and
+            st.session_state.get('news_data') is None and
+            st.session_state.get('show_news', True)):
         with st.spinner("Loading market news..."):
-            st.session_state.news_data = fetch_news_data()
+            try:
+                st.session_state.news_data = fetch_news_data()
+            except Exception as e:
+                logger.error(f"Error loading news data: {e}")
+                st.session_state.news_data = None
 
-    # Main navigation with all tabs including Strategy Builder
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(
-        ["💰 Investment Analysis", "📰 News & Sentiment", "🔍 Stock Explorer", "🐂 Trade Views", "🎯 Strategy Builder"])
+    # Main navigation with all tabs including Learning Center
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "💰 Investment Analysis",
+        "📰 News & Sentiment",
+        "🔍 Stock Explorer",
+        "🐂 Trade Views",
+        "🎯 Strategy Builder",
+        "🎓 Learn"
+    ])
 
     with tab1:
-        render_investment_analysis_tab()
+        if INVESTMENT_ANALYSIS_AVAILABLE:
+            try:
+                render_investment_analysis_tab()
+            except Exception as e:
+                st.error(f"❌ Error loading investment analysis: {str(e)}")
+                logger.error(f"Investment analysis error: {e}")
+        else:
+            render_fallback_tab("Investment Analysis", """
+            - Personalized stock recommendations based on your risk profile
+            - Portfolio optimization suggestions
+            - Risk assessment and capital allocation
+            - Investment strategy recommendations
+            """)
 
     with tab2:
-        render_news_sentiment_tab()
+        if NEWS_SENTIMENT_AVAILABLE:
+            try:
+                render_news_sentiment_tab()
+            except Exception as e:
+                st.error(f"❌ Error loading news sentiment: {str(e)}")
+                logger.error(f"News sentiment error: {e}")
+        else:
+            render_fallback_tab("News & Sentiment", """
+            - Real-time market news aggregation
+            - Sentiment analysis of news articles
+            - Market mood indicators
+            - News impact on stock prices
+            """)
 
     with tab3:
         # Stock Explorer tab action buttons
@@ -407,84 +551,170 @@ def main():
         with col2:
             if st.button("🔄 Refresh Stock Data", key="refresh_stocks",
                          help="Clear cache and reload fresh stock data", use_container_width=True):
-                # Clear the specific cache for stock data
-                fetch_stock_data.clear()
-                st.rerun()
+                try:
+                    if STOCK_EXPLORER_AVAILABLE:
+                        fetch_stock_data.clear()
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error refreshing data: {str(e)}")
 
-        # Fetch and display stock data
-        stock_data = fetch_stock_data()
-        stock_df = prepare_stock_dataframe(stock_data) if stock_data else None
-        render_stock_explorer(stock_df)
-
-    with tab4:
-        # Trade Views tab action buttons
-        col1, col2 = st.columns([4, 1])
-        with col2:
-            if st.button("🔄 Refresh Trade Views", key="refresh_trade_views",
-                         help="Clear cache and reload fresh trade views data", use_container_width=True):
-                # Clear the trade views cache
-                fetch_trade_views.clear()
-                st.rerun()
-
-        # Render the trade views dashboard
-        try:
-            # Fetch and process trade views data
-            trade_views_data = fetch_trade_views()
-            trade_views_df = prepare_trade_views_dataframe(trade_views_data) if trade_views_data else None
-
-            if trade_views_df is None or trade_views_df.empty:
-                st.warning("⚠️ No live bullish trades available at the moment.")
-                st.info(
-                    "This could be due to market conditions or data availability. Please try refreshing in a few minutes.")
-            else:
-                # Render trade views components
-                render_trade_views_summary(trade_views_df)
-                st.markdown("---")
-                render_sector_analysis(trade_views_df)
-                st.markdown("---")
-                render_trade_views_table(trade_views_df)
-
-                # Footer with last updated time
-                st.markdown("---")
-                st.caption(f"Trade views last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-
-        except Exception as e:
-            st.error(f"❌ Error loading trade views: {str(e)}")
-            logger.error(f"Trade views error in main: {e}")
-
-    with tab5:
-        # Strategy Builder tab
-        try:
-            # Add helpful description at the top
-            st.info(
-                "🎯 **Strategy Builder**: Create custom stock screening strategies using technical indicators, sentiment analysis, and fundamental filters. Build your strategy step by step and execute it to find stocks that match your criteria.")
-
-            # Render the strategy builder interface
-            render_strategy_builder()
-
-        except Exception as e:
-            st.error(f"❌ Error loading strategy builder: {str(e)}")
-            logger.error(f"Strategy builder error in main: {e}")
-
-            # Provide fallback message
-            st.markdown("""
-            ### 🎯 Strategy Builder (Temporarily Unavailable)
-
-            The strategy builder is currently experiencing issues. Please try:
-            1. Refreshing the page
-            2. Checking your internet connection
-            3. Contacting support if the issue persists
-
-            **What you can do with Strategy Builder:**
-            - Create custom technical indicator rules
-            - Set sentiment analysis filters  
-            - Define fundamental criteria (price, volume, market cap)
-            - Execute strategies to find matching stocks
-            - Download results for further analysis
+        if STOCK_EXPLORER_AVAILABLE:
+            try:
+                # Fetch and display stock data
+                stock_data = fetch_stock_data()
+                stock_df = prepare_stock_dataframe(stock_data) if stock_data else None
+                render_stock_explorer(stock_df)
+            except Exception as e:
+                st.error(f"❌ Error loading stock explorer: {str(e)}")
+                logger.error(f"Stock explorer error: {e}")
+        else:
+            render_fallback_tab("Stock Explorer", """
+            - Browse and filter stock market data
+            - Interactive stock charts and analysis
+            - Sector performance comparison
+            - Real-time price tracking
+            - Advanced filtering and sorting options
             """)
 
-    # Render sidebar
-    render_sidebar()
+    with tab4:
+        if TRADE_VIEW_AVAILABLE:
+            # Trade Views tab action buttons
+            col1, col2 = st.columns([4, 1])
+            with col2:
+                if st.button("🔄 Refresh Trade Views", key="refresh_trade_views",
+                             help="Clear cache and reload fresh trade views data", use_container_width=True):
+                    try:
+                        fetch_trade_views.clear()
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error refreshing trade views: {str(e)}")
+
+            # Render the trade views dashboard
+            try:
+                # Fetch and process trade views data
+                trade_views_data = fetch_trade_views()
+                trade_views_df = prepare_trade_views_dataframe(trade_views_data) if trade_views_data else None
+
+                if trade_views_df is None or trade_views_df.empty:
+                    st.warning("⚠️ No live bullish trades available at the moment.")
+                    st.info(
+                        "This could be due to market conditions or data availability. Please try refreshing in a few minutes.")
+                else:
+                    # Render trade views components
+                    render_trade_views_summary(trade_views_df)
+                    st.markdown("---")
+                    render_sector_analysis(trade_views_df)
+                    st.markdown("---")
+                    render_trade_views_table(trade_views_df)
+
+                    # Footer with last updated time
+                    st.markdown("---")
+                    st.caption(f"Trade views last updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+
+            except Exception as e:
+                st.error(f"❌ Error loading trade views: {str(e)}")
+                logger.error(f"Trade views error in main: {e}")
+        else:
+            render_fallback_tab("Trade Views", """
+            - Live bullish trade recommendations
+            - Sector-wise trade analysis
+            - Market sentiment from trading community
+            - Real-time trade signals and alerts
+            """)
+
+    with tab5:
+        if STRATEGY_AVAILABLE:
+            # Strategy Builder tab
+            try:
+                # Add helpful description at the top
+                st.info(
+                    "🎯 **Strategy Builder**: Create custom stock screening strategies using technical indicators, "
+                    "sentiment analysis, and fundamental filters. Build your strategy step by step and execute it "
+                    "to find stocks that match your criteria.")
+
+                # Render the strategy builder interface
+                render_strategy_builder()
+
+            except Exception as e:
+                st.error(f"❌ Error loading strategy builder: {str(e)}")
+                logger.error(f"Strategy builder error in main: {e}")
+
+                # Provide fallback message
+                st.markdown("""
+                ### 🎯 Strategy Builder (Temporarily Unavailable)
+
+                The strategy builder is currently experiencing issues. Please try:
+                1. Refreshing the page
+                2. Checking your internet connection
+                3. Contacting support if the issue persists
+
+                **What you can do with Strategy Builder:**
+                - Create custom technical indicator rules
+                - Set sentiment analysis filters  
+                - Define fundamental criteria (price, volume, market cap)
+                - Execute strategies to find matching stocks
+                - Download results for further analysis
+                """)
+        else:
+            render_fallback_tab("Strategy Builder", """
+            - Custom stock screening strategies
+            - Technical indicator combinations
+            - Fundamental analysis filters
+            - Backtesting capabilities
+            - Strategy performance tracking
+            """)
+
+    with tab6:
+        if LEARN_AVAILABLE:
+            # Learning tab
+            try:
+                st.info(
+                    "🎓 **Learning Center**: Master the stock market from beginner to expert level. "
+                    "Interactive lessons, progress tracking, quizzes, and curated resources to enhance your investment knowledge.")
+
+                render_learn_tab()
+
+            except Exception as e:
+                st.error(f"❌ Error loading learning center: {str(e)}")
+                logger.error(f"Learning center error in main: {e}")
+
+                # Provide fallback message with more detail
+                st.markdown("""
+                ### 🎓 Learning Center (Error Occurred)
+
+                There was an error loading the learning center. This could be due to:
+                1. Module import issues
+                2. Session state conflicts
+                3. Interactive component errors
+
+                **Expected Learning Modules:**
+                - **🌱 Beginner Level**: Stock market basics, terminology, how to start investing
+                - **📈 Intermediate Level**: Fundamental analysis, technical analysis, portfolio management
+                - **🎯 Advanced Level**: Options & derivatives, sector analysis, quantitative methods
+                - **🏆 Expert Level**: Advanced strategies, behavioral finance, institutional approaches
+                - **📝 Interactive Features**: Quizzes, progress tracking, live demonstrations
+                - **📚 Resources**: Curated books, courses, and additional learning materials
+
+                Please refresh the page or contact support if the issue persists.
+                """)
+        else:
+            render_fallback_tab("Learning Center", """
+            - Comprehensive stock market education from beginner to expert
+            - Interactive lessons and demonstrations
+            - Progress tracking and achievement system
+            - Quizzes and knowledge assessments
+            - Curated learning resources and recommendations
+            """)
+
+    # Render sidebar with proper error handling
+    try:
+        render_sidebar()
+    except Exception as e:
+        logger.error(f"Sidebar error: {e}")
+        # Show minimal sidebar if there's an error
+        with st.sidebar:
+            st.markdown("📈 **Stock Investment Advisor**")
+            st.error("⚠️ Sidebar temporarily unavailable")
 
 
 if __name__ == "__main__":
