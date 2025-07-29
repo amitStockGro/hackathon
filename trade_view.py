@@ -191,10 +191,8 @@ def render_trade_views_summary(df: pd.DataFrame):
     with cols[0]:
         st.metric("Total Bullish Trades", metrics["total_trades"])
     with cols[1]:
-        st.metric("Avg % Achieved", f"{metrics['avg_percentage_achieved']:.1f}%")
-    with cols[2]:
         st.metric("Positive Trades", f"{metrics['positive_percentage']:.1f}%")
-    with cols[3]:
+    with cols[2]:
         st.metric("Active Sectors", metrics["sectors_count"])
 
     # Additional insights
