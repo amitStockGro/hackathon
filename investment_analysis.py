@@ -37,7 +37,7 @@ TIMELINE_MAPPING = {
 # Configuration constants
 API_CONFIG = {
     "base_url": "https://stage.stockgro.com/hackathon",
-    "timeout": 30,
+    "timeout": 120,
     "retry_attempts": 3,
     "retry_delay": 1
 }
